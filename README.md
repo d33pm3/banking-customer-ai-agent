@@ -3,13 +3,64 @@
 **Version 1.0 · Initial Release Demo**
 **Demo Version Only — For Evaluation by Bank Technology Team Only**
 
-Browser-based digital banking service desk: omni-channel complaint intake, four rule-driven
-service agents, RBI/board-policy redress engine, human-in-the-loop control, audit trail and
-regulatory reporting.
+Dummy bank only. This is not SBI software and not RBI software.
 
----
+The four service agents are **rule-driven TypeScript** (`src/lib/domain/agents.ts`). This build makes no live LLM calls and contacts no external model API.
 
-## 1. Architecture overview
+Browser-based digital banking service desk: omni-channel complaint intake, four rule-driven service agents, RBI/board-policy redress engine, human-in-the-loop control, audit trail and regulatory reporting.
+
+The product specification on this tree is [`specification.md`](specification.md).
+
+## This is / this is not
+
+**This is** an unofficial evaluation demo of a bank complaint / grievance desk (dummy: State Bank of Faridabad).
+**This is** a local React / TanStack app with four rule-driven service agents, a case state machine, HITL, and an audit log.
+**This is** an eval build that stores cases in browser `localStorage`.
+**This is not** SBI, RBI, or any real bank’s production system.
+**This is not** a live LLM or multi-model agent platform — no outbound model calls in this build.
+**This is not** a hosted SaaS or a customer-facing bank portal on the internet.
+**This is not** a regulatory filing, ombudsman decision, or compliance conclusion.
+**This is not** a complete `src/` tree on `main` — the runnable source is in `Codebase.zip`.
+
+## Where the source is
+
+The **complete application source** is in [`Codebase.zip`](Codebase.zip), under:
+
+- `4_Bank Customer Support Agent/src/`
+- `4_Bank Customer Support Agent/public/`
+
+There is no `src/` on `main`. Extract the zip before `bun run dev`.
+
+## Run the eval build
+
+Requires Node.js 18+ and Bun or npm. Dev server: http://localhost:8080. The evaluation build needs no environment variables.
+
+```bash
+git clone https://github.com/d33pm3/banking-customer-ai-agent.git
+cd banking-customer-ai-agent
+unzip -o Codebase.zip
+cp -a "4_Bank Customer Support Agent/src/." src/
+cp -a "4_Bank Customer Support Agent/public/." public/
+bun install       # or: npm install
+bun run dev       # http://localhost:8080
+bun run build
+```
+
+After extract, `src/lib/domain/agents.ts` must exist. If it does not, the zip did not unpack.
+
+Demo sign-in: pick any listed staff identity on the login screen and enter the shown PIN. Customers self-register in the portal (`/portal`) and receive a unique `CUST-…` ID.
+
+## What is not deployed
+
+- There is no hosted URL, GitHub Pages site, or Vercel project in this repository.
+- This build does not call a live LLM, a bank core, or any external API.
+- Persistence is browser `localStorage` only. Postgres / SSO / `DATABASE_URL` are a production *profile*, not this package.
+- Do not treat cases, TAT, or redress amounts as a bank record or a regulatory filing.
+- Demo identities and seeded cases must be removed before any production use.
+
+To serve the eval build yourself after `bun run build`, host `dist/` behind your own reverse proxy or CDN. Swapping `src/lib/domain/store.ts` for a database client is a separate hardening step.
+
+## Architecture overview
 
 ```
  Channels                     Application (React / TanStack Start)
@@ -36,7 +87,7 @@ regulatory reporting.
 Case state machine: `NEW → TRIAGED → IN_PROGRESS → GHO_REVIEW → HITL_REQUIRED → RESOLVED → CLOSED`
 with explicit transition guards; invalid transitions are rejected, never silently applied.
 
-## 2. Tech stack
+## Tech stack
 
 | Layer | Technology |
 |---|---|
@@ -49,38 +100,20 @@ with explicit transition guards; invalid transitions are rejected, never silentl
 
 Brand palette: primary `#B02A30`, secondary `#F99D27`, accent `#005B75`, off-white neutrals.
 
-## 3. Run locally
+## Environment variables
 
-```bash
-bun install       # or: npm install
-bun run dev       # http://localhost:8080
-bun run build     # production build
-```
-
-Demo sign-in: pick any listed staff identity on the login screen and enter the shown PIN.
-Customers self-register in the portal (`/portal`) and receive a unique `CUST-…` ID.
-
-## 4. Deploy
-
-- Static/edge deployment of the Vite build output; no backend is required for the evaluation build.
-- Publish from Lovable, or serve `dist/` behind the bank's reverse proxy / CDN.
-- Production profile: replace the storage adapter in `src/lib/domain/store.ts` with a database
-  client, place the app behind the bank's SSO, and enable server-side audit persistence.
-
-## 5. Environment variables
-
-The evaluation build needs none. For the production profile:
+The evaluation build needs none. A future production profile might use:
 
 | Variable | Purpose |
 |---|---|
-| `VITE_API_BASE_URL` | Base URL of the bank's case API |
+| `VITE_API_BASE_URL` | Base URL of a case API |
 | `DATABASE_URL` | Server-side database connection string |
 | `SESSION_SECRET` | Session signing secret |
 | `SSO_ISSUER`, `SSO_CLIENT_ID` | Enterprise identity provider |
 
-Client-visible values must use the `VITE_` prefix; everything else stays server-side.
+Those variables are **not wired in this demo**. Client-visible values must use the `VITE_` prefix; everything else stays server-side.
 
-## 6. Security notes
+## Security notes
 
 - Role-based route guards; unauthorised roles are redirected before data loads.
 - PII redaction (account, card, mobile, e-mail) in narratives, traces and exports.
@@ -88,9 +121,8 @@ Client-visible values must use the `VITE_` prefix; everything else stays server-
 - Append-only audit log of every state change, assignment, tool call and override.
 - Overrides require a written justification recorded against the officer (four-eyes).
 - No third-party analytics, no outbound calls; this build contacts no external service.
-- Demo identities and seeded cases must be removed before any production use.
 
-## 7. Mapping to the specification
+## Mapping to the specification
 
 | Spec section | Where implemented |
 |---|---|
@@ -102,12 +134,8 @@ Client-visible values must use the `VITE_` prefix; everything else stays server-
 | 3.6 Audit & reporting | `audit.tsx`, `reports.tsx`, `metrics.ts` |
 | 4 Administrator guide | Routing desk, policy library, reports, audit screens |
 
-## 8. Companion artefacts
+## License
 
-- `Digital_Banking_Specification.docx` — product specification and administrator guide
-- `Digital_Banking_Offline_Demo.html` — single-file offline demo
-- `Digital_Banking_Codebase.zip` — full source bundle
-- `Digital_Banking_Codebase_Manifest.json` — every source file with path and content
+MIT. See `LICENSE`.
 
----
-*Demo version for simulation and testing with real policies of RBI and Specific Bank — For Evaluation by Bank Technology Team Only*
+You may use this code; this is not a bank production system and not a regulatory filing.
