@@ -1,7 +1,7 @@
-# Customer Complaint Navigator — State Bank of Faridabad
+# Customer Complaint Navigator — State Bank of Faridabad (Dummy Bank Name)
 
-**Version 1.0 · 02 September 2026**
-**Confidential — For Evaluation by Bank Technology Team Only**
+**Version 1.0 · Initial Release Demo**
+**Demo Version Only — For Evaluation by Bank Technology Team Only**
 
 Browser-based digital banking service desk: omni-channel complaint intake, four rule-driven
 service agents, RBI/board-policy redress engine, human-in-the-loop control, audit trail and
@@ -110,4 +110,4 @@ Client-visible values must use the `VITE_` prefix; everything else stays server-
 - `Digital_Banking_Codebase_Manifest.json` — every source file with path and content
 
 ---
-*Confidential — For Evaluation by Bank Technology Team Only · v1.0 · 02 September 2026*
+*Demo version for simulation and testing with real policies of RBI and Specific Bank — For Evaluation by Bank Technology Team Only*
