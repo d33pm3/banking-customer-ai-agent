@@ -1,4 +1,4 @@
-name: Inspect packaged source
+name: Verify packaged-source coverage
 
 on:
   push:
@@ -9,55 +9,43 @@ permissions:
   contents: read
 
 jobs:
-  inspect:
+  verify:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      - name: Extract and inventory Codebase.zip
+      - name: Verify every legitimate archive file has a tracked root counterpart
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf /tmp/codebase-extracted /tmp/codebase-filtered
-          mkdir -p /tmp/codebase-extracted /tmp/codebase-filtered
-          unzip -q Codebase.zip -d /tmp/codebase-extracted
-          {
-            echo '=== TOP LEVEL ==='
-            find /tmp/codebase-extracted -mindepth 1 -maxdepth 2 -printf '%P\n' | sort
-            echo
-            echo '=== ALL FILES ==='
-            find /tmp/codebase-extracted -type f -printf '%P\n' | sort
-          } > /tmp/source-manifest.txt
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          unzip -q Codebase.zip -d "$tmp"
+          mapfile -t roots < <(find "$tmp" -mindepth 1 -maxdepth 1 -type d -print)
+          test "${#roots[@]}" -eq 1
+          app="${roots[0]}"
 
-          rsync -a \
-            --exclude='node_modules/' \
-            --exclude='dist/' \
-            --exclude='build/' \
-            --exclude='.git/' \
-            --exclude='.env' \
-            --exclude='.env.*' \
-            --exclude='.DS_Store' \
-            --exclude='Thumbs.db' \
-            --exclude='.idea/' \
-            --exclude='.vscode/' \
-            --exclude='.cache/' \
-            --exclude='coverage/' \
-            --exclude='.turbo/' \
-            --exclude='.next/' \
-            --exclude='.output/' \
-            --exclude='.vinxi/' \
-            --exclude='.nitro/' \
-            --exclude='.wrangler/' \
-            /tmp/codebase-extracted/ /tmp/codebase-filtered/
+          echo 'Archive application root:'
+          basename "$app"
+          echo 'Archive top-level entries:'
+          find "$app" -mindepth 1 -maxdepth 1 -printf '%f\n' | sort
 
-          cp /tmp/source-manifest.txt /tmp/codebase-filtered/__SOURCE_MANIFEST__.txt
+          missing=0
+          while IFS= read -r -d '' file; do
+            rel="${file#"$app/"}"
+            case "$rel" in
+              node_modules/*|dist/*|build/*|.git/*|.cache/*|coverage/*|.turbo/*|.next/*|.output/*|.vinxi/*|.nitro/*|.wrangler/*|.idea/*|.vscode/*|.DS_Store|Thumbs.db|.env|.env.*)
+                continue
+                ;;
+            esac
+            if [ ! -f "$rel" ]; then
+              echo "::error::Missing tracked counterpart for archive file: $rel"
+              missing=1
+            fi
+          done < <(find "$app" -type f -print0)
 
-      - name: Upload filtered source inspection artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: filtered-source-inspection
-          path: /tmp/codebase-filtered
-          if-no-files-found: error
-          retention-days: 1
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
