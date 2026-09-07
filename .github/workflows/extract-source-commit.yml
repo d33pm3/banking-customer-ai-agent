@@ -1,0 +1,78 @@
+name: Extract tracked application source
+
+on:
+  push:
+    branches:
+      - chore/extract-tracked-source-and-ci
+    paths:
+      - .github/workflows/extract-source-commit.yml
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout remediation branch
+        uses: actions/checkout@v4
+        with:
+          ref: chore/extract-tracked-source-and-ci
+          fetch-depth: 0
+
+      - name: Extract legitimate tracked source
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          unzip -q Codebase.zip -d "$tmp"
+
+          mapfile -t roots < <(find "$tmp" -mindepth 1 -maxdepth 1 -type d -print)
+          test "${#roots[@]}" -eq 1
+          app="${roots[0]}"
+
+          test -d "$app/src"
+          test -d "$app/public"
+          test -f "$app/vite.config.ts"
+
+          if find "$app" -type f \( -name '.env' -o -name '.env.*' \) ! -name '.env.example' ! -name '.env.sample' ! -name '.env.template' -print -quit | grep -q .; then
+            echo '::error::Archive contains a real environment file; refusing extraction.'
+            exit 1
+          fi
+
+          if find "$app" -type d \( -name node_modules -o -name dist -o -name build -o -name .git -o -name .cache -o -name coverage \) -print -quit | grep -q .; then
+            echo '::error::Archive contains excluded generated/dependency directories; refusing blind extraction.'
+            exit 1
+          fi
+
+          for target in src public scripts vite.config.ts .lovable supabase; do
+            if [ -e "$app/$target" ]; then
+              if [ -e "$target" ]; then
+                echo "::error::Target already exists at repository root: $target"
+                exit 1
+              fi
+              cp -a "$app/$target" "$target"
+            fi
+          done
+
+          rm -rf .lovable/.env .lovable/.env.* supabase/.env supabase/.env.* 2>/dev/null || true
+
+          git add src public scripts vite.config.ts
+          [ ! -e .lovable ] || git add .lovable
+          [ ! -e supabase ] || git add supabase
+
+          if git diff --cached --quiet; then
+            echo '::error::No tracked source was extracted.'
+            exit 1
+          fi
+
+      - name: Commit extracted tracked source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'chore: extract tracked application source'
+          git push origin HEAD:chore/extract-tracked-source-and-ci
