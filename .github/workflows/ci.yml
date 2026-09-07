@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - chore/extract-tracked-source-and-ci
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Verify tracked application entry files
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f package.json
+          test -f bun.lock
+          test -f vite.config.ts
+          test -f src/router.tsx
+          test -f src/routes/__root.tsx
+          test -f public/robots.txt
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies from lockfile
+        run: bun install --frozen-lockfile
+
+      - name: Lint if defined
+        shell: bash
+        run: |
+          set -euo pipefail
+          if bun -e "const p = await Bun.file('package.json').json(); process.exit(p.scripts?.lint ? 0 : 1)"; then
+            bun run lint
+          else
+            echo 'No lint script defined; skipping.'
+          fi
+
+      - name: Test if defined
+        shell: bash
+        run: |
+          set -euo pipefail
+          if bun -e "const p = await Bun.file('package.json').json(); process.exit(p.scripts?.test ? 0 : 1)"; then
+            bun run test
+          else
+            echo 'No test script defined; skipping.'
+          fi
+
+      - name: Production build
+        run: bun run build
