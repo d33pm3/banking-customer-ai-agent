@@ -16,7 +16,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout remediation branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: chore/extract-tracked-source-and-ci
           fetch-depth: 0
@@ -47,15 +47,15 @@ jobs:
             exit 1
           fi
 
-          for target in src public scripts vite.config.ts .lovable supabase; do
-            if [ -e "$app/$target" ]; then
-              if [ -e "$target" ]; then
-                echo "::error::Target already exists at repository root: $target"
-                exit 1
-              fi
+          for target in src public scripts .lovable supabase; do
+            if [ -e "$app/$target" ] && [ ! -e "$target" ]; then
               cp -a "$app/$target" "$target"
             fi
           done
+
+          if [ ! -e vite.config.ts ]; then
+            cp -a "$app/vite.config.ts" vite.config.ts
+          fi
 
           rm -rf .lovable/.env .lovable/.env.* supabase/.env supabase/.env.* 2>/dev/null || true
 
@@ -64,7 +64,7 @@ jobs:
           [ ! -e supabase ] || git add supabase
 
           if git diff --cached --quiet; then
-            echo '::error::No tracked source was extracted.'
+            echo '::error::No missing tracked source was extracted.'
             exit 1
           fi
 
