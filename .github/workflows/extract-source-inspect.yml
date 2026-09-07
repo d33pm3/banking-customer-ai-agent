@@ -1,0 +1,63 @@
+name: Inspect packaged source
+
+on:
+  push:
+    branches:
+      - chore/extract-tracked-source-and-ci
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract and inventory Codebase.zip
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/codebase-extracted /tmp/codebase-filtered
+          mkdir -p /tmp/codebase-extracted /tmp/codebase-filtered
+          unzip -q Codebase.zip -d /tmp/codebase-extracted
+          {
+            echo '=== TOP LEVEL ==='
+            find /tmp/codebase-extracted -mindepth 1 -maxdepth 2 -printf '%P\n' | sort
+            echo
+            echo '=== ALL FILES ==='
+            find /tmp/codebase-extracted -type f -printf '%P\n' | sort
+          } > /tmp/source-manifest.txt
+
+          rsync -a \
+            --exclude='node_modules/' \
+            --exclude='dist/' \
+            --exclude='build/' \
+            --exclude='.git/' \
+            --exclude='.env' \
+            --exclude='.env.*' \
+            --exclude='.DS_Store' \
+            --exclude='Thumbs.db' \
+            --exclude='.idea/' \
+            --exclude='.vscode/' \
+            --exclude='.cache/' \
+            --exclude='coverage/' \
+            --exclude='.turbo/' \
+            --exclude='.next/' \
+            --exclude='.output/' \
+            --exclude='.vinxi/' \
+            --exclude='.nitro/' \
+            --exclude='.wrangler/' \
+            /tmp/codebase-extracted/ /tmp/codebase-filtered/
+
+          cp /tmp/source-manifest.txt /tmp/codebase-filtered/__SOURCE_MANIFEST__.txt
+
+      - name: Upload filtered source inspection artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: filtered-source-inspection
+          path: /tmp/codebase-filtered
+          if-no-files-found: error
+          retention-days: 1
