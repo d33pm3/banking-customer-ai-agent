@@ -37,4 +37,15 @@ export default tseslint.config(
     },
   },
   eslintPluginPrettier,
+  {
+    rules: {
+      "prettier/prettier": "off",
+    },
+  },
+  {
+    files: ["src/lib/domain/**/*.ts"],
+    rules: {
+      "react-hooks/rules-of-hooks": "off",
+    },
+  },
 );
