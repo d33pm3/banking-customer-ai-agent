@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - ci/remediate-truthful-baseline
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate packaged source layout
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .ci-source src public
+          mkdir -p .ci-source src public
+          unzip -q -o Codebase.zip -d .ci-source
+          test -f ".ci-source/4_Bank Customer Support Agent/src/lib/domain/agents.ts"
+          cp -a ".ci-source/4_Bank Customer Support Agent/src/." src/
+          cp -a ".ci-source/4_Bank Customer Support Agent/public/." public/
+          test -f src/lib/domain/agents.ts
+
+      - name: Reject committed environment files
+        shell: bash
+        run: |
+          set -euo pipefail
+          if find .ci-source -type f \( -name '.env' -o -name '.env.*' \) ! -name '.env.example' ! -name '.env.sample' ! -name '.env.template' -print -quit | grep -q .; then
+            echo '::error::Packaged source contains a committed environment file.'
+            exit 1
+          fi
+
+      - name: Confirm no live LLM connector wiring
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -RIlE 'api\.openai\.com|api\.anthropic\.com|generativelanguage\.googleapis\.com|OPENAI_API_KEY|ANTHROPIC_API_KEY|GEMINI_API_KEY' src package.json 2>/dev/null | grep -q .; then
+            echo '::error::Live LLM connector wiring detected; CI must use env-presence and mocks instead of live calls.'
+            exit 1
+          fi
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Deterministic install
+        run: bun install --frozen-lockfile
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Test if repository defines tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          if node -e "const p=require('./package.json'); process.exit(p.scripts && p.scripts.test ? 0 : 1)"; then
+            bun run test
+          else
+            echo '::notice::package.json defines no test script; CI does not invent one.'
+          fi
+
+      - name: Production build
+        run: bun run build
